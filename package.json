@@ -1,0 +1,38 @@
+{
+  "name": "ai-exam-grader",
+  "version": "0.1.0",
+  "private": true,
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "dev": "next dev -H 127.0.0.1",
+    "build": "next build",
+    "start": "next start -H 127.0.0.1",
+    "lint": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "app": "next build && next start -H 127.0.0.1"
+  },
+  "dependencies": {
+    "@fontsource/heebo": "^5.3.0",
+    "html2canvas-pro": "^2.5.0",
+    "jspdf": "^4.2.1",
+    "mammoth": "^1.13.0",
+    "next": "15.5",
+    "openai": "^7.45.1",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.3",
+    "@types/node": "^22.20.5",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "postcss": "^8.5.32",
+    "tailwindcss": "^4.3.3",
+    "typescript": "5.9",
+    "vitest": "^5.0.5"
+  }
+}
