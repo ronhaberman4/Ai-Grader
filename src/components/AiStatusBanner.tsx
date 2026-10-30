@@ -13,12 +13,12 @@ export function AiStatusBanner() {
   }, []);
   if (configured !== false) return null;
   return (
-    <Alert tone="warning" title="עדיין לא הוגדר מפתח OpenAI">
-      כדי שה-AI יוכל לבדוק מבחנים, יש ליצור מפתח ב-
-      <a className="underline ltr" href="https://platform.openai.com/api-keys" target="_blank" rel="noreferrer">
-        platform.openai.com/api-keys
+    <Alert tone="warning" title="עדיין לא הוגדר מפתח API של Claude">
+      כדי ש-Claude יוכל לבדוק מבחנים, יש ליצור מפתח ב-
+      <a className="underline ltr" href="https://console.anthropic.com/settings/keys" target="_blank" rel="noreferrer">
+        console.anthropic.com
       </a>
-      , להוסיף אותו לקובץ <code className="ltr">.env.local</code> בשורה <code className="ltr">OPENAI_API_KEY=sk-...</code> ולהפעיל מחדש את
+      , להוסיף אותו לקובץ <code className="ltr">.env.local</code> בשורה <code className="ltr">ANTHROPIC_API_KEY=sk-ant-...</code> ולהפעיל מחדש את
       האתר. ראו הוראות בקובץ README.
     </Alert>
   );

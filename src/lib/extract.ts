@@ -1,11 +1,12 @@
+import type Anthropic from "@anthropic-ai/sdk";
 import { readStored } from "./storage";
 import type { StoredFile } from "./types";
 
-/** A piece of model input: either plain text or a file (PDF / image) the vision model reads directly. */
+/** A piece of model input: plain text, or a PDF / image that Claude reads visually. */
 export type InputPart =
-  | { type: "input_text"; text: string }
-  | { type: "input_image"; image_url: string; detail: "high" }
-  | { type: "input_file"; filename: string; file_data: string };
+  | Anthropic.Beta.Messages.BetaTextBlockParam
+  | Anthropic.Beta.Messages.BetaImageBlockParam
+  | Anthropic.Beta.Messages.BetaRequestDocumentBlock;
 
 export class ExtractionError extends Error {}
 
@@ -17,19 +18,25 @@ async function docxToText(buf: Buffer): Promise<string> {
 
 /**
  * Converts a stored file into model input parts.
- * - PDF: sent as a file; the model receives both the text layer and page images,
- *   so scanned / handwritten PDFs are read visually (OCR by the vision model).
- * - Images: sent at high detail for handwriting recognition.
+ * - PDF: sent as a document block; Claude receives both the text layer and page images,
+ *   so scanned / handwritten PDFs are read visually (OCR by the model).
+ * - Images: sent as image blocks for handwriting recognition.
  * - DOCX / TXT: text is extracted locally.
  */
 export async function fileToParts(f: StoredFile, label: string): Promise<InputPart[]> {
   const buf = readStored(f);
-  const header: InputPart = { type: "input_text", text: `--- ${label}: "${f.filename}" ---` };
+  const header = `--- ${label}: "${f.filename}" ---`;
   if (f.mime === "application/pdf") {
-    return [header, { type: "input_file", filename: f.filename, file_data: `data:application/pdf;base64,${buf.toString("base64")}` }];
+    return [
+      { type: "text", text: header },
+      { type: "document", title: f.filename, source: { type: "base64", media_type: "application/pdf", data: buf.toString("base64") } },
+    ];
   }
-  if (f.mime.startsWith("image/")) {
-    return [header, { type: "input_image", image_url: `data:${f.mime};base64,${buf.toString("base64")}`, detail: "high" }];
+  if (f.mime === "image/jpeg" || f.mime === "image/png") {
+    return [
+      { type: "text", text: header },
+      { type: "image", source: { type: "base64", media_type: f.mime, data: buf.toString("base64") } },
+    ];
   }
   let text: string;
   try {
@@ -39,5 +46,5 @@ export async function fileToParts(f: StoredFile, label: string): Promise<InputPa
   }
   text = text.replace(/\r\n/g, "\n").trim();
   if (!text) throw new ExtractionError(`לא נמצא טקסט בקובץ "${f.filename}".`);
-  return [{ type: "input_text", text: `${header.text}\n${text}` }];
+  return [{ type: "text", text: `${header}\n${text}` }];
 }

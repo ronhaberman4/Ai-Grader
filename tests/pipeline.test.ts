@@ -37,8 +37,8 @@ const writing = (c1: number, c2: number, c3: number) =>
   });
 
 /** Grades each student by a number written in their file: "score:N". */
-function scoreFromText(req: { input: { type: string; text?: string }[] }): GradingOutput {
-  const text = req.input.map((p) => p.text ?? "").join("\n");
+function scoreFromText(req: { input: { type: string }[] }): GradingOutput {
+  const text = req.input.map((p) => ("text" in p ? (p.text as string) : "")).join("\n");
   if (text.includes("FAIL")) throw new Error("simulated network failure");
   const n = Number(/score:(\d+)/.exec(text)?.[1] ?? 0);
   return output([answer("q1", n), answer("q2", 10, { readability: text.includes("messy") ? "unreadable" : "clear" }), writing(6, 4, 4)]);
@@ -59,8 +59,8 @@ describe("end-to-end grading pipeline", () => {
       issues: [{ severity: "warning", questionNumber: null, message: "לא נמצא מחוון לשאלת הכתיבה" }],
     }));
     const after = await service.extractRubric(s.id, "Spelling: no deduction in reading.");
-    expect(calls[0].input.some((p) => p.type === "input_text" && p.text.includes("bus broke down"))).toBe(true);
-    expect(calls[0].input.some((p) => p.type === "input_text" && p.text.includes("Spelling: no deduction"))).toBe(true);
+    expect(calls[0].input.some((p) => p.type === "text" && p.text.includes("bus broke down"))).toBe(true);
+    expect(calls[0].input.some((p) => p.type === "text" && p.text.includes("Spelling: no deduction"))).toBe(true);
     expect(after.rubric!.questions).toHaveLength(2);
     expect(after.rubricIssues.some((i) => i.source === "ai")).toBe(true);
     expect(after.rubricIssues.some((i) => i.severity === "error" && i.message.includes("20"))).toBe(true);
@@ -228,8 +228,8 @@ describe("file handling", () => {
     const pdf = saveUpload("x", "exam.pdf", Buffer.from("%PDF-1.4\n%%EOF"));
     const png = saveUpload("x", "page.png", Buffer.from([0x89, 0x50, 0x4e, 0x47, 0, 0]));
     const txt = saveUpload("x", "notes.txt", Buffer.from("hello"));
-    expect((await fileToParts(pdf, "F"))[1]).toMatchObject({ type: "input_file", filename: "exam.pdf" });
-    expect((await fileToParts(png, "F"))[1]).toMatchObject({ type: "input_image", detail: "high" });
-    expect((await fileToParts(txt, "F"))[0]).toMatchObject({ type: "input_text" });
+    expect((await fileToParts(pdf, "F"))[1]).toMatchObject({ type: "document", title: "exam.pdf", source: { media_type: "application/pdf" } });
+    expect((await fileToParts(png, "F"))[1]).toMatchObject({ type: "image", source: { type: "base64", media_type: "image/png" } });
+    expect((await fileToParts(txt, "F"))[0]).toMatchObject({ type: "text" });
   });
 });

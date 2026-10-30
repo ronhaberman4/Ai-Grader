@@ -81,7 +81,7 @@ export async function extractRubric(sessionId: string, pastedText: string): Prom
   for (const kind of ["exam", "answer_key", "rubric"] as const) {
     for (const f of files.filter((x) => x.kind === kind)) input.push(...(await fileToParts(f, labels[kind])));
   }
-  if (pastedText.trim()) input.push({ type: "input_text", text: `--- TEACHER'S TYPED GRADING INSTRUCTIONS / RUBRIC ---\n${pastedText.trim()}` });
+  if (pastedText.trim()) input.push({ type: "text", text: `--- TEACHER'S TYPED GRADING INSTRUCTIONS / RUBRIC ---\n${pastedText.trim()}` });
   if (input.length === 0) throw new ServiceError("יש להעלות קבצים (מבחן / תשובון / מחוון) או להדביק הנחיות בדיקה.");
 
   const client = getModelClient();
@@ -198,7 +198,7 @@ export async function runGrading(submissionId: string): Promise<void> {
     if (!s.rubricLockedAt || !s.rubric || !s.rubricHash) throw new ServiceError("המחוון אינו נעול.");
     const rubric = s.rubric;
 
-    const input: InputPart[] = [{ type: "input_text", text: GRADING_USER_PREAMBLE }];
+    const input: InputPart[] = [{ type: "text", text: GRADING_USER_PREAMBLE }];
     for (const [i, f] of sub.files.entries()) input.push(...(await fileToParts(f, `STUDENT FILE ${i + 1} of ${sub.files.length}`)));
 
     const client = getModelClient();
@@ -334,7 +334,7 @@ export async function generateInsights(sessionId: string) {
   const out = await getModelClient().structured({
     name: "class_insights",
     instructions: insightsInstructions(s),
-    input: [{ type: "input_text", text: insightsInput(stats, s.rubric as Rubric) }],
+    input: [{ type: "text", text: insightsInput(stats, s.rubric as Rubric) }],
     schema: InsightsOutputSchema,
   });
   db.setInsights(sessionId, { ...out, basedOnCount: stats.count });

@@ -1,8 +1,8 @@
 import { z } from "zod";
 import { ASSESSMENT_AREAS, CONFIDENCE, MISTAKE_CATEGORIES, READABILITY } from "./types";
 
-// Schemas for OpenAI structured outputs. Strict mode requires every field to be
-// present, so optional values are expressed as nullable.
+// Schemas for Claude structured outputs. Every field is required, so optional
+// values are expressed as nullable.
 
 const Localized = z.object({ en: z.string().nullable(), he: z.string().nullable() });
 
