@@ -95,6 +95,7 @@ export function fakeModel(respond: (req: StructuredRequest<z.ZodTypeAny>) => unk
     async structured(req) {
       calls.push(req);
       const data = await respond(req);
+      req.onUsage?.([{ model: "claude-sonnet-5-5", inputTokens: 10_000, outputTokens: 5_000, cacheReadTokens: 0, cacheWriteTokens: 0 }]);
       return req.schema.parse(data);
     },
   };

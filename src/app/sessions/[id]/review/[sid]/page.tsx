@@ -7,6 +7,7 @@ import { OverallEditor } from "@/components/OverallEditor";
 import { QuestionReview } from "@/components/QuestionReview";
 import { Alert, Button, ButtonLink, ErrorText, Modal, Spinner, StatusBadge, fmt, inputClass, inputBase } from "@/components/ui";
 import { api } from "@/lib/client/api";
+import { formatUsd } from "@/lib/pricing";
 import { computeTotals, hasTeacherChanges, type ReviewAction } from "@/lib/scoring";
 import type { GradingSession, Submission, SubmissionStatus } from "@/lib/types";
 
@@ -142,6 +143,11 @@ export default function ReviewPage({ params }: { params: Promise<{ id: string; s
               <Score label="הצעת AI" value={sub.aiTotal} max={session.maxScore} muted />
               <Score label="אחרי עריכת מורה" value={totals.currentTotal} max={session.maxScore} highlight={totals.teacherAdjusted} />
               <Score label="ציון סופי מאושר" value={sub.finalScore} max={session.maxScore} final />
+              {sub.costUsd !== null && (
+                <div className="self-end pb-1 text-xs text-slate-500" title="הערכה לפי מחירון Anthropic, כולל בדיקות חוזרות">
+                  עלות בדיקה: <span className="ltr">{formatUsd(sub.costUsd)}</span>
+                </div>
+              )}
             </div>
           )}
           <div className="ms-auto flex flex-wrap gap-2">

@@ -4,18 +4,22 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "@/lib/client/api";
 import { prepareImage } from "@/lib/client/resize";
+import { formatUsd } from "@/lib/pricing";
 import { computeTotals } from "@/lib/scoring";
+import type { SessionCost } from "@/lib/db";
 import type { GradingSession, Submission } from "@/lib/types";
 import { ACCEPT, FileDrop } from "./FileDrop";
 import { Alert, Badge, Button, ButtonLink, Card, Empty, ErrorText, Modal, StatusBadge, fmt, inputClass, inputBase } from "./ui";
 
 export function useSubmissions(sessionId: string) {
   const [subs, setSubs] = useState<Submission[] | null>(null);
+  const [cost, setCost] = useState<SessionCost | null>(null);
   const [error, setError] = useState<string | null>(null);
   const reload = useCallback(async () => {
     try {
-      const r = await api<{ submissions: Submission[] }>(`/api/sessions/${sessionId}/submissions`);
+      const r = await api<{ submissions: Submission[]; cost: SessionCost }>(`/api/sessions/${sessionId}/submissions`);
       setSubs(r.submissions);
+      setCost(r.cost);
       setError(null);
     } catch (e) {
       setError((e as Error).message);
@@ -30,11 +34,11 @@ export function useSubmissions(sessionId: string) {
     const t = setInterval(reload, 2500);
     return () => clearInterval(t);
   }, [active, reload]);
-  return { subs, setSubs, reload, error };
+  return { subs, setSubs, reload, error, cost };
 }
 
 export function UploadPanel({ session, onGoRubric }: { session: GradingSession; onGoRubric: () => void }) {
-  const { subs, reload, error: loadError } = useSubmissions(session.id);
+  const { subs, reload, error: loadError, cost } = useSubmissions(session.id);
   const [combine, setCombine] = useState(false);
   const [name, setName] = useState("");
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
@@ -118,12 +122,12 @@ export function UploadPanel({ session, onGoRubric }: { session: GradingSession; 
         )}
       </Card>
       <ErrorText error={loadError} />
-      <QueueTable session={session} subs={subs} reload={reload} />
+      <QueueTable session={session} subs={subs} reload={reload} cost={cost} />
     </div>
   );
 }
 
-function QueueTable({ session, subs, reload }: { session: GradingSession; subs: Submission[] | null; reload: () => void }) {
+function QueueTable({ session, subs, reload, cost }: { session: GradingSession; subs: Submission[] | null; reload: () => void; cost: SessionCost | null }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [toDelete, setToDelete] = useState<Submission | null>(null);
@@ -155,6 +159,7 @@ function QueueTable({ session, subs, reload }: { session: GradingSession; subs: 
           {counts.needs_review && <Badge tone="amber">{counts.needs_review} דורשות בדיקה</Badge>}
           {counts.ready && <Badge tone="green">{counts.ready} מוכנות לאישור</Badge>}
           {counts.failed && <Badge tone="red">{counts.failed} נכשלו</Badge>}
+          {cost && cost.calls > 0 && <CostBadge cost={cost} graded={subs.filter((s) => s.costUsd).length} />}
         </div>
       }
     >
@@ -167,6 +172,7 @@ function QueueTable({ session, subs, reload }: { session: GradingSession; subs: 
               <th className="p-2">קבצים</th>
               <th className="p-2">סטטוס</th>
               <th className="p-2">הצעת AI</th>
+              <th className="p-2">עלות</th>
               <th className="p-2"></th>
             </tr>
           </thead>
@@ -198,6 +204,7 @@ function QueueTable({ session, subs, reload }: { session: GradingSession; subs: 
                   )}
                 </td>
                 <td className="p-2 ltr text-right">{s.aiTotal !== null ? `${fmt(s.aiTotal)} / ${fmt(session.maxScore)}` : "—"}</td>
+                <td className="p-2 ltr text-right text-xs text-slate-500">{formatUsd(s.costUsd)}</td>
                 <td className="p-2">
                   <div className="flex flex-wrap justify-end gap-1">
                     {(s.status === "needs_review" || s.status === "ready" || s.status === "approved") && (
@@ -410,5 +417,21 @@ export function ReviewPanel({ session }: { session: GradingSession }) {
         </div>
       </Modal>
     </div>
+  );
+}
+
+export function CostBadge({ cost, graded }: { cost: SessionCost; graded: number }) {
+  return (
+    <span
+      className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-700"
+      title={`בניית מחוון: ${formatUsd(cost.rubric)} · בדיקת עבודות: ${formatUsd(cost.grading)} · תובנות: ${formatUsd(cost.insights)} — הערכה לפי מחירון Anthropic`}
+    >
+      עלות AI עד כה: <b className="ltr">{formatUsd(cost.total)}</b>
+      {graded > 0 && cost.grading > 0 && (
+        <span className="text-slate-500">
+          · ממוצע לתלמיד <span className="ltr">{formatUsd(cost.grading / graded)}</span>
+        </span>
+      )}
+    </span>
   );
 }

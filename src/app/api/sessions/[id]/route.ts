@@ -9,6 +9,7 @@ export const dynamic = "force-dynamic";
 export const GET = route<{ id: string }>(async (_req, { id }) => ({
   session: mustGetSession(id),
   files: db.listSessionFiles(id),
+  cost: db.sessionCost(id),
 }));
 
 export const PATCH = route<{ id: string }>(async (req, { id }) => {

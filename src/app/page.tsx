@@ -7,6 +7,7 @@ import { Badge, ButtonLink, Empty, ErrorText, Spinner } from "@/components/ui";
 import { api } from "@/lib/client/api";
 import type { SessionSummary } from "@/lib/db";
 import { ASSESSMENT_TYPE_LABELS } from "@/lib/labels";
+import { formatUsd } from "@/lib/pricing";
 
 export default function Home() {
   const [sessions, setSessions] = useState<SessionSummary[] | null>(null);
@@ -58,6 +59,7 @@ export default function Home() {
               <span>{s.submissionCount} עבודות</span>
               {s.needsReviewCount > 0 && <Badge tone="amber">{s.needsReviewCount} דורשות בדיקה</Badge>}
               {s.approvedCount > 0 && <Badge tone="green">{s.approvedCount} מאושרות</Badge>}
+              {s.costUsd !== null && <span className="ms-auto text-xs text-slate-500">עלות AI: <span className="ltr">{formatUsd(s.costUsd)}</span></span>}
             </div>
             {s.submissionCount > 0 && (
               <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-100">

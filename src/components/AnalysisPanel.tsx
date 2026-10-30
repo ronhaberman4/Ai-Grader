@@ -4,18 +4,24 @@ import { useEffect, useState } from "react";
 import type { ClassStats } from "@/lib/analytics";
 import { api } from "@/lib/client/api";
 import { AREA_LABELS, MISTAKE_LABELS } from "@/lib/labels";
+import type { SessionCost } from "@/lib/db";
+import { formatUsd } from "@/lib/pricing";
 import type { GradingSession } from "@/lib/types";
 import { Alert, Badge, Button, ButtonLink, Card, Empty, ErrorText, Spinner, Stat, fmt } from "./ui";
 
 export function AnalysisPanel({ session, onSession }: { session: GradingSession; onSession: (s: GradingSession) => void }) {
   const [stats, setStats] = useState<ClassStats | null>(null);
+  const [cost, setCost] = useState<SessionCost | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     if (!session.rubric) return;
-    api<{ stats: ClassStats }>(`/api/sessions/${session.id}/analytics`)
-      .then((r) => setStats(r.stats))
+    api<{ stats: ClassStats; cost: SessionCost }>(`/api/sessions/${session.id}/analytics`)
+      .then((r) => {
+        setStats(r.stats);
+        setCost(r.cost);
+      })
       .catch((e) => setError(e.message));
   }, [session.id, session.rubric]);
 
@@ -176,6 +182,21 @@ export function AnalysisPanel({ session, onSession }: { session: GradingSession;
                 </li>
               ))}
           </ul>
+        </Card>
+      )}
+
+      {cost && cost.calls > 0 && (
+        <Card title="עלות ה-AI למבחן זה">
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+            <Stat label="סה״כ" value={formatUsd(cost.total)} />
+            <Stat label="בניית המחוון" value={formatUsd(cost.rubric)} />
+            <Stat label="בדיקת עבודות" value={formatUsd(cost.grading)} sub={stats.students.length ? `ממוצע לתלמיד ${formatUsd(cost.grading / (stats.count + stats.pendingCount || 1))}` : undefined} />
+            <Stat label="תובנות כיתתיות" value={formatUsd(cost.insights)} />
+          </div>
+          <p className="mt-3 text-xs text-slate-500">
+            הערכה לפי המחירון הרשמי של Anthropic, כולל בדיקות חוזרות. החיוב המדויק מופיע ב-console.anthropic.com בעמוד Usage.
+            {cost.unpriced > 0 && ` ${cost.unpriced} קריאות לא תומחרו כי המודל אינו ברשימת המחירים.`}
+          </p>
         </Card>
       )}
 

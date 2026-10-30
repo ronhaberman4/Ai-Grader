@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 export const GET = route<{ id: string }>(async (_req, { id }) => {
   const session = mustGetSession(id);
   resumePending(id);
-  return { session, submissions: db.listSubmissions(id), queue: gradingQueue().stats() };
+  return { session, submissions: db.listSubmissions(id), queue: gradingQueue().stats(), cost: db.sessionCost(id) };
 });
 
 /**

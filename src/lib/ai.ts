@@ -2,12 +2,15 @@ import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import type { z } from "zod";
 import type { InputPart } from "./extract";
+import { usageByModel, type TokenUsage } from "./pricing";
 
 export type StructuredRequest<T extends z.ZodTypeAny> = {
   name: string;
   instructions: string;
   input: InputPart[];
   schema: T;
+  /** Called as soon as a response arrives (even if it later fails validation), so every billed call is recorded. */
+  onUsage?: (usage: TokenUsage[]) => void;
 };
 
 /** Minimal interface so the grading pipeline can be tested without network calls. */
@@ -18,7 +21,7 @@ export interface ModelClient {
 
 export class AiError extends Error {}
 
-export const DEFAULT_MODEL = "claude-opus-5-5";
+export const DEFAULT_MODEL = "claude-sonnet-5-5";
 
 export function modelName(): string {
   return process.env.GRADER_MODEL || DEFAULT_MODEL;
@@ -43,7 +46,9 @@ class ClaudeModelClient implements ModelClient {
       const stream = this.client.beta.messages.stream({
         model: this.model,
         max_tokens: 64000,
-        system: req.instructions,
+        // The grading instructions (including the locked rubric) are identical for every student,
+        // so caching them makes every student after the first cheaper.
+        system: [{ type: "text", text: req.instructions, cache_control: { type: "ephemeral" } }],
         messages: [{ role: "user", content: req.input }],
         output_config: { effort, format: zodOutputFormat(req.schema) },
         // If a safety classifier declines, the API retries on a fallback model instead of failing.
@@ -54,6 +59,7 @@ class ClaudeModelClient implements ModelClient {
     } catch (e) {
       throw new AiError(describeError(e));
     }
+    req.onUsage?.(usageByModel(message.model, message.usage));
 
     if (message.stop_reason === "refusal") {
       throw new AiError("Claude סירב לבצע את הבקשה. בדקו שהקבצים הם עבודות תלמידים ונסו שוב.");

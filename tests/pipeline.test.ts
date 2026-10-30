@@ -165,6 +165,13 @@ describe("end-to-end grading pipeline", () => {
     expect(stats.needsSupport.map((x) => x.submissionId)).toEqual([b]);
     expect(stats.distribution.reduce((n, d) => n + d.count, 0)).toBe(2);
 
+    // Every AI call is costed: 4 grading runs × (10k in × $2 + 5k out × $10) / 1M = 4 × $0.07.
+    const cost = db.sessionCost(s.id);
+    expect(cost.calls).toBe(4);
+    expect(cost.grading).toBeCloseTo(0.28, 6);
+    expect(db.getSubmission(b)!.costUsd).toBeCloseTo(0.21, 6); // graded three times
+    expect(db.getSubmission(a)!.costUsd).toBeCloseTo(0.07, 6);
+
     // Unapproving reopens editing and removes the student from the stats.
     service.unapproveSubmission(a);
     expect(service.classStats(s.id).count).toBe(1);

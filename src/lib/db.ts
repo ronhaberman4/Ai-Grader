@@ -1,6 +1,7 @@
 import { DatabaseSync } from "node:sqlite";
 import fs from "node:fs";
 import path from "node:path";
+import { costUsd, type TokenUsage } from "./pricing";
 import { newId } from "./rubric";
 import type {
   ClassInsights,
@@ -88,6 +89,21 @@ CREATE TABLE IF NOT EXISTS submission_files (
   page_order INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_submission_files_sub ON submission_files(submission_id);
+CREATE TABLE IF NOT EXISTS ai_usage (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+  submission_id TEXT,
+  kind TEXT NOT NULL,
+  model TEXT NOT NULL,
+  input_tokens INTEGER NOT NULL,
+  output_tokens INTEGER NOT NULL,
+  cache_read_tokens INTEGER NOT NULL,
+  cache_write_tokens INTEGER NOT NULL,
+  cost_usd REAL,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_ai_usage_session ON ai_usage(session_id);
+CREATE INDEX IF NOT EXISTS idx_ai_usage_submission ON ai_usage(submission_id);
 `;
 
 type Row = Record<string, unknown>;
@@ -180,6 +196,7 @@ export type SessionSummary = GradingSession & {
   submissionCount: number;
   approvedCount: number;
   needsReviewCount: number;
+  costUsd: number | null;
 };
 
 export function listSessions(): SessionSummary[] {
@@ -188,7 +205,8 @@ export function listSessions(): SessionSummary[] {
       `SELECT s.*,
         (SELECT COUNT(*) FROM submissions x WHERE x.session_id = s.id) AS submission_count,
         (SELECT COUNT(*) FROM submissions x WHERE x.session_id = s.id AND x.status = 'approved') AS approved_count,
-        (SELECT COUNT(*) FROM submissions x WHERE x.session_id = s.id AND x.status = 'needs_review') AS needs_review_count
+        (SELECT COUNT(*) FROM submissions x WHERE x.session_id = s.id AND x.status = 'needs_review') AS needs_review_count,
+        (SELECT SUM(u.cost_usd) FROM ai_usage u WHERE u.session_id = s.id) AS cost_usd
        FROM sessions s ORDER BY s.updated_at DESC`,
     )
     .all() as Row[];
@@ -197,6 +215,7 @@ export function listSessions(): SessionSummary[] {
     submissionCount: Number(r.submission_count),
     approvedCount: Number(r.approved_count),
     needsReviewCount: Number(r.needs_review_count),
+    costUsd: r.cost_usd === null ? null : Number(r.cost_usd),
   }));
 }
 
@@ -283,6 +302,8 @@ export function deleteSessionFile(fileId: string) {
 
 // ---------- Submissions ----------
 
+const SUB_COST = "(SELECT SUM(u.cost_usd) FROM ai_usage u WHERE u.submission_id = s.id) AS cost_usd";
+
 function rowToSubmission(r: Row, files: SubmissionFile[]): Submission {
   return {
     id: r.id as string,
@@ -304,6 +325,7 @@ function rowToSubmission(r: Row, files: SubmissionFile[]): Submission {
     approvedAt: (r.approved_at as string) ?? null,
     createdAt: r.created_at as string,
     updatedAt: r.updated_at as string,
+    costUsd: r.cost_usd === null || r.cost_usd === undefined ? null : Number(r.cost_usd),
     files,
   };
 }
@@ -336,14 +358,14 @@ export function createSubmission(sessionId: string, studentName: string, nameSou
 }
 
 export function getSubmission(id: string): Submission | null {
-  const r = getDb().prepare("SELECT * FROM submissions WHERE id=?").get(id) as Row | undefined;
+  const r = getDb().prepare(`SELECT s.*, ${SUB_COST} FROM submissions s WHERE s.id=?`).get(id) as Row | undefined;
   if (!r) return null;
   return rowToSubmission(r, filesFor([id]).get(id) ?? []);
 }
 
 export function listSubmissions(sessionId: string): Submission[] {
   const rows = getDb()
-    .prepare("SELECT * FROM submissions WHERE session_id=? ORDER BY created_at, rowid")
+    .prepare(`SELECT s.*, ${SUB_COST} FROM submissions s WHERE s.session_id=? ORDER BY s.created_at, s.rowid`)
     .all(sessionId) as Row[];
   const files = filesFor(rows.map((r) => r.id as string));
   return rows.map((r) => rowToSubmission(r, files.get(r.id as string) ?? []));
@@ -428,4 +450,43 @@ export function deleteSubmissionFile(fileId: string) {
 export function getSubmissionFile(fileId: string): SubmissionFile | null {
   const r = getDb().prepare("SELECT * FROM submission_files WHERE id=?").get(fileId) as Row | undefined;
   return r ? { ...rowToFile(r), submissionId: r.submission_id as string, pageOrder: Number(r.page_order) } : null;
+}
+
+// ---------- AI usage & cost ----------
+
+export type UsageKind = "rubric" | "grading" | "insights";
+
+export function recordUsage(sessionId: string, submissionId: string | null, kind: UsageKind, usage: TokenUsage[]) {
+  const stmt = getDb().prepare(
+    `INSERT INTO ai_usage (session_id, submission_id, kind, model, input_tokens, output_tokens, cache_read_tokens,
+      cache_write_tokens, cost_usd, created_at) VALUES (?,?,?,?,?,?,?,?,?,?)`,
+  );
+  for (const u of usage) {
+    stmt.run(sessionId, submissionId, kind, u.model, u.inputTokens, u.outputTokens, u.cacheReadTokens, u.cacheWriteTokens, costUsd(u), now());
+  }
+}
+
+export type SessionCost = {
+  total: number;
+  rubric: number;
+  grading: number;
+  insights: number;
+  calls: number;
+  /** Calls whose model price is unknown (not included in the totals). */
+  unpriced: number;
+};
+
+export function sessionCost(sessionId: string): SessionCost {
+  const rows = getDb()
+    .prepare("SELECT kind, SUM(cost_usd) AS cost, COUNT(*) AS n, SUM(cost_usd IS NULL) AS unpriced FROM ai_usage WHERE session_id=? GROUP BY kind")
+    .all(sessionId) as Row[];
+  const out: SessionCost = { total: 0, rubric: 0, grading: 0, insights: 0, calls: 0, unpriced: 0 };
+  for (const r of rows) {
+    const cost = Number(r.cost ?? 0);
+    out[r.kind as UsageKind] = cost;
+    out.total += cost;
+    out.calls += Number(r.n);
+    out.unpriced += Number(r.unpriced ?? 0);
+  }
+  return out;
 }

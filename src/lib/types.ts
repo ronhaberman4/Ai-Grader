@@ -201,6 +201,8 @@ export type Submission = {
   approvedAt: string | null;
   createdAt: string;
   updatedAt: string;
+  /** Estimated AI cost of all grading runs of this submission (USD). */
+  costUsd: number | null;
   files: SubmissionFile[];
 };
 

@@ -14,7 +14,7 @@
 
 1. התקינו את **Node.js** (גרסה 22.13 ומעלה, מומלץ 24 LTS) מהאתר https://nodejs.org.
 2. הורידו את הקוד (Code → Download ZIP ב-GitHub) וחלצו אותו לתיקייה.
-3. צרו מפתח API של Claude בכתובת https://console.anthropic.com/settings/keys. צריך להוסיף אמצעי תשלום או לטעון קרדיט בחשבון. עלות בדיקת מבחן תלויה באורכו, ובדרך כלל מדובר בכמה סנטים.
+3. צרו מפתח API של Claude בכתובת https://console.anthropic.com/settings/keys. צריך להוסיף אמצעי תשלום או לטעון קרדיט בחשבון. עלות בדיקה משוערת עם Sonnet 5.5: כ-15–25 סנט לתלמיד. האתר מציג את העלות של כל עבודה ושל כל מבחן.
 4. בתיקיית הפרויקט העתיקו את הקובץ `.env.example` לקובץ חדש בשם `.env.local`, ומלאו בו:
    - `ANTHROPIC_API_KEY`: המפתח שיצרתם (מתחיל ב-`sk-ant-`)
    - `APP_PASSWORD`: סיסמה לכניסה לאתר (מומלץ)
@@ -37,7 +37,7 @@
 | משתנה | תיאור | ברירת מחדל |
 |---|---|---|
 | `ANTHROPIC_API_KEY` | מפתח API של Claude (חובה) | — |
-| `GRADER_MODEL` | מודל Claude | `claude-opus-5-5` |
+| `GRADER_MODEL` | מודל Claude (למשל `claude-sonnet-5-5`, או `claude-opus-5-5` לבדיקה חזקה ויקרה יותר) | `claude-sonnet-5-5` |
 | `GRADER_EFFORT` | רמת המאמץ: `low` / `medium` / `high` / `xhigh` / `max` | `high` |
 | `APP_PASSWORD` | סיסמת כניסה. אם ריק, אין סיסמה | — |
 | `SESSION_SECRET` | סוד לחתימת עוגיית הכניסה | — |
@@ -48,8 +48,9 @@
 
 ## Technical overview
 
-- **Stack**: Next.js 15 (App Router), React 19, TypeScript, Tailwind CSS 4, Anthropic Claude API (`@anthropic-ai/sdk`, model `claude-opus-5-5`), SQLite via Node's built-in `node:sqlite` (no native build step), Vitest.
+- **Stack**: Next.js 15 (App Router), React 19, TypeScript, Tailwind CSS 4, Anthropic Claude API (`@anthropic-ai/sdk`, default model `claude-sonnet-5-5`), SQLite via Node's built-in `node:sqlite` (no native build step), Vitest.
 - **AI calls** (`src/lib/ai.ts`) are server-side only. They use Claude's structured outputs (`output_config.format` built from the Zod schemas in `src/lib/ai-schemas.ts`), and every response is validated again on our side. Requests are streamed, so long grading responses don't hit HTTP timeouts. Server-side refusal fallback is enabled (`fallbacks: "default"`).
+- **Cost tracking** (`src/lib/pricing.ts`, `ai_usage` table): every call's token usage is recorded as soon as the response arrives (also when it later fails validation) and priced from Anthropic's published rates, per model when a fallback ran. Costs are shown per submission, per exam, and on the home page. The grading instructions (rubric) are prompt-cached, so every student after the first is cheaper.
 - **Files** (`src/lib/extract.ts`): PDFs (as `document` blocks) and images (as `image` blocks) go straight to Claude, which reads both the text layer and the page images, so Claude does the OCR of scans and handwriting. DOCX/TXT are extracted locally with `mammoth`. Large phone photos are downscaled in the browser before upload. Files are type-checked by extension and magic bytes, and stored outside `public/`.
 - **Deterministic scoring** (`src/lib/scoring.ts`): the model only suggests per-question or per-criterion points. Clamping to `[0, max]`, totals, the "needs review" logic, teacher overrides and regrade merging all happen in code. Unreadable answers get no suggestion (`null`), so the teacher has to score them.
 - **Rubric consistency** (`src/lib/rubric.ts`, `src/lib/service.ts`): locking validates the rubric (totals must equal the max score, no duplicate numbers, etc.) and stores a SHA-256 hash of the rubric plus grading settings. Every submission records the hash it was graded with, and approval is refused if the hash doesn't match. Locked rubrics and grading settings can't be edited, and a rubric can't be unlocked once any student has been graded with it.

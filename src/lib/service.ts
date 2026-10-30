@@ -88,6 +88,7 @@ export async function extractRubric(sessionId: string, pastedText: string): Prom
   const out = await client.structured({
     name: "rubric_extraction",
     instructions: rubricExtractionInstructions(s),
+    onUsage: (u) => db.recordUsage(sessionId, null, "rubric", u),
     input,
     schema: RubricExtractionSchema,
   });
@@ -205,6 +206,7 @@ export async function runGrading(submissionId: string): Promise<void> {
     const output = await client.structured({
       name: "grading_result",
       instructions: gradingInstructions(s, rubric),
+      onUsage: (u) => db.recordUsage(s.id, submissionId, "grading", u),
       input,
       schema: GradingOutputSchema,
     });
@@ -334,6 +336,7 @@ export async function generateInsights(sessionId: string) {
   const out = await getModelClient().structured({
     name: "class_insights",
     instructions: insightsInstructions(s),
+    onUsage: (u) => db.recordUsage(sessionId, null, "insights", u),
     input: [{ type: "text", text: insightsInput(stats, s.rubric as Rubric) }],
     schema: InsightsOutputSchema,
   });
