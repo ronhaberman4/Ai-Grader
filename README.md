@@ -10,29 +10,32 @@
 4. **בדיקה**: לכל שאלה מוצגים תשובת התלמיד, התשובה הצפויה, ציון מוצע, הסבר, משוב ומידת ודאות. תשובות לא קריאות מסומנות לבדיקה ידנית, וה-AI לא מנחש אותן. הקובץ המקורי מוצג לצד הבדיקה.
 5. **אישור ודוחות**: אישור ציון סופי, דוח PDF לכל תלמיד (או לכל הכיתה בקובץ אחד), ייצוא ל-Excel, וניתוח כיתתי עם תובנות להוראה.
 
-## התקנה על המחשב שלך (פעם אחת)
+## התקנה ב-Windows (פעם אחת, כ-15 דקות)
 
-1. התקינו את **Node.js** (גרסה 22.13 ומעלה, מומלץ 24 LTS) מהאתר https://nodejs.org.
-2. הורידו את הקוד (Code → Download ZIP ב-GitHub) וחלצו אותו לתיקייה.
-3. צרו מפתח API של Claude בכתובת https://console.anthropic.com/settings/keys. צריך להוסיף אמצעי תשלום או לטעון קרדיט בחשבון. עלות בדיקה משוערת עם Sonnet 5.5: כ-15–25 סנט לתלמיד. האתר מציג את העלות של כל עבודה ושל כל מבחן.
-4. בתיקיית הפרויקט העתיקו את הקובץ `.env.example` לקובץ חדש בשם `.env.local`, ומלאו בו:
-   - `ANTHROPIC_API_KEY`: המפתח שיצרתם (מתחיל ב-`sk-ant-`)
-   - `APP_PASSWORD`: סיסמה לכניסה לאתר (מומלץ)
-   - `SESSION_SECRET`: מחרוזת אקראית ארוכה כלשהי
-5. פתחו טרמינל (במחשב Windows: PowerShell) בתיקיית הפרויקט והריצו:
-   ```
-   npm install
-   npm run app
-   ```
-6. פתחו בדפדפן את הכתובת **http://localhost:3000**.
+1. **התקנת Node.js:** נכנסים ל-https://nodejs.org, לוחצים על הכפתור הירוק (LTS) ומתקינים עם Next, Next, Finish.
+2. **הורדת האתר:** מורידים את הקובץ
+   https://github.com/ronhaberman4/Ai-Grader/archive/refs/heads/claude/ai-exam-grader-mvp-9upzuk.zip
+   ואז לוחצים עליו בכפתור הימני, בוחרים **"חלץ הכל" (Extract All)**, ומחלצים למקום קבוע, למשל "המסמכים".
+3. **הפעלה:** בתיקייה שחולצה לוחצים לחיצה כפולה על **`Start-Grader.bat`**.
+   - אם Windows מציג "Windows protected your PC", לוחצים **More info** ואז **Run anyway**.
+   - בפעם הראשונה ההכנה לוקחת כמה דקות. בסופה הדפדפן נפתח לבד.
+   - החלון השחור צריך להישאר פתוח כל זמן העבודה. סוגרים אותו כדי לכבות את האתר.
+4. **חיבור ל-Claude:** באתר לוחצים על **הגדרות** ומדביקים מפתח API. ההוראות ליצירת המפתח מופיעות על המסך.
+   מומלץ גם לבחור שם סיסמת כניסה.
 
-בפעמים הבאות מספיק להריץ `npm start` (אחרי `npm run app` ראשון). האתר זמין רק מהמחשב שלכם (127.0.0.1).
+**בפעמים הבאות:** לחיצה כפולה על `Start-Grader.bat`, וזהו.
+
+## התקנה ב-Mac / Linux
+
+מתקינים Node.js (גרסה 22.13 ומעלה), ובתיקיית הפרויקט מריצים `npm install` ואז `npm run app`. אחר כך פותחים את http://localhost:3000 ומגדירים את המפתח במסך **הגדרות**.
 
 ## איפה נשמרים הנתונים
 
-כל המידע (מסד הנתונים והקבצים שהועלו) נשמר בתיקייה `data/` שבתוך הפרויקט, על המחשב שלכם בלבד. לגיבוי מעתיקים את התיקייה הזאת. הקבצים נשלחים ל-Claude (Anthropic) רק לצורך הבדיקה.
+כל המידע (מסד הנתונים והקבצים שהועלו) נשמר בתיקייה `data/` שבתוך הפרויקט, על המחשב שלכם בלבד. לגיבוי מעתיקים את התיקייה הזאת. **כשמורידים גרסה חדשה של האתר, מעתיקים את תיקיית `data` מהגרסה הישנה לחדשה.** כך המבחנים, הציונים וההגדרות עוברים איתכם. הקבצים נשלחים ל-Claude (Anthropic) רק לצורך הבדיקה.
 
-## הגדרות (`.env.local`)
+## הגדרות מתקדמות (`.env.local`, לא חובה)
+
+כל ההגדרות החשובות זמינות במסך **הגדרות** באתר. אם מגדירים ערך גם בקובץ `.env.local`, הערך מהקובץ גובר.
 
 | משתנה | תיאור | ברירת מחדל |
 |---|---|---|
@@ -59,7 +62,9 @@
 - **Batch processing** (`src/lib/queue.ts`): an in-process queue with bounded concurrency. One failure doesn't stop the others. Work interrupted by a restart is re-queued.
 - **Class analysis** (`src/lib/analytics.ts`): computed only from approved grades. AI insights are generated from anonymized aggregates and labeled as AI interpretation.
 - **Reports**: rendered as HTML (correct Hebrew/English bidi) and exported to A4 PDF in the browser (`src/lib/client/pdf.ts`), with page breaks between blocks.
-- **Auth**: optional single-teacher password with an HMAC-signed httpOnly cookie. Pages are protected by middleware, and every API route checks auth itself (`src/lib/api.ts`).
+- **Settings** (`src/lib/settings.ts`, `/settings` page): the API key (verified with a free models lookup before saving), model choice and login password are stored in `data/settings.json`. Environment variables override them. The cookie-signing secret is generated automatically.
+- **Auth**: optional single-teacher password with an HMAC-signed httpOnly cookie. Pages are protected by Node.js-runtime middleware (so it can read the settings file), and every API route checks auth itself (`src/lib/api.ts`).
+- **Windows launcher** (`Start-Grader.bat`): checks the Node.js version, runs `npm install` and `npm run build` the first time, starts the server on 127.0.0.1 and opens the browser.
 
 ### Commands
 

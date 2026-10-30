@@ -11,5 +11,7 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
+  // Node.js runtime so the password saved on the settings screen (data/settings.json) can be read.
+  runtime: "nodejs",
   matcher: ["/((?!api|login|_next|favicon.ico).*)"],
 };

@@ -3,6 +3,7 @@ import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import type { z } from "zod";
 import type { InputPart } from "./extract";
 import { usageByModel, type TokenUsage } from "./pricing";
+import { apiKey, configuredModel } from "./settings";
 
 export type StructuredRequest<T extends z.ZodTypeAny> = {
   name: string;
@@ -24,11 +25,11 @@ export class AiError extends Error {}
 export const DEFAULT_MODEL = "claude-sonnet-5-5";
 
 export function modelName(): string {
-  return process.env.GRADER_MODEL || DEFAULT_MODEL;
+  return configuredModel() || DEFAULT_MODEL;
 }
 
 export function isAiConfigured(): boolean {
-  const key = process.env.ANTHROPIC_API_KEY;
+  const key = apiKey();
   return !!key && key !== "sk-ant-...";
 }
 
@@ -36,7 +37,7 @@ type Effort = "low" | "medium" | "high" | "xhigh" | "max";
 
 class ClaudeModelClient implements ModelClient {
   model = modelName();
-  private client = new Anthropic({ timeout: 10 * 60_000, maxRetries: 2 });
+  private client = new Anthropic({ apiKey: apiKey(), timeout: 10 * 60_000, maxRetries: 2 });
 
   async structured<T extends z.ZodTypeAny>(req: StructuredRequest<T>): Promise<z.infer<T>> {
     const effort = (process.env.GRADER_EFFORT?.trim() || "high") as Effort;
@@ -86,9 +87,9 @@ class ClaudeModelClient implements ModelClient {
 }
 
 function describeError(e: unknown): string {
-  if (e instanceof Anthropic.AuthenticationError) return "מפתח ה-API של Claude אינו תקין. בדקו את ANTHROPIC_API_KEY בקובץ .env.local.";
+  if (e instanceof Anthropic.AuthenticationError) return "מפתח ה-API של Claude אינו תקין. בדקו אותו במסך ההגדרות.";
   if (e instanceof Anthropic.PermissionDeniedError) return "למפתח אין הרשאה למודל זה. בדקו את החשבון ב-console.anthropic.com.";
-  if (e instanceof Anthropic.NotFoundError) return `המודל "${modelName()}" לא נמצא. בדקו את GRADER_MODEL.`;
+  if (e instanceof Anthropic.NotFoundError) return `המודל "${modelName()}" לא זמין בחשבון שלכם. בחרו מודל אחר במסך ההגדרות.`;
   if (e instanceof Anthropic.RateLimitError) return "חרגתם ממגבלת הקצב או מהיתרה בחשבון Claude. נסו שוב בעוד דקה, או בדקו את החיוב.";
   if (e instanceof Anthropic.BadRequestError) return "Claude דחה את הבקשה: " + e.message;
   if (e instanceof Anthropic.APIError) return `שגיאה מ-Claude (${e.status ?? "רשת"}): ${e.message}`;
@@ -105,7 +106,20 @@ export function setModelClientForTests(client: ModelClient | null) {
 export function getModelClient(): ModelClient {
   if (override) return override;
   if (!isAiConfigured()) {
-    throw new AiError("לא הוגדר מפתח API של Claude. יש להוסיף ANTHROPIC_API_KEY לקובץ .env.local ולהפעיל מחדש את האתר.");
+    throw new AiError("לא הוגדר מפתח API של Claude. הדביקו אותו במסך ההגדרות (בתפריט למעלה).");
   }
   return new ClaudeModelClient();
+}
+
+/** Checks that a key works and can use the chosen model. Free: it only reads model metadata. */
+export async function testApiKey(key: string, model: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    await new Anthropic({ apiKey: key, maxRetries: 0, timeout: 20_000 }).models.retrieve(model);
+    return { ok: true };
+  } catch (e) {
+    if (e instanceof Anthropic.AuthenticationError) return { ok: false, error: "המפתח אינו תקין. ודאו שהעתקתם אותו במלואו (מתחיל ב-sk-ant-)." };
+    if (e instanceof Anthropic.NotFoundError) return { ok: false, error: `המפתח תקין, אבל המודל ${model} לא זמין בחשבון.` };
+    if (e instanceof Anthropic.PermissionDeniedError) return { ok: false, error: "למפתח אין הרשאה. בדקו את החשבון ב-console.anthropic.com." };
+    return { ok: false, error: describeError(e) };
+  }
 }

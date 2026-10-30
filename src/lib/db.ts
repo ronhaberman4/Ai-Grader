@@ -2,6 +2,7 @@ import { DatabaseSync } from "node:sqlite";
 import fs from "node:fs";
 import path from "node:path";
 import { costUsd, type TokenUsage } from "./pricing";
+import { dataDir } from "./paths";
 import { newId } from "./rubric";
 import type {
   ClassInsights,
@@ -20,9 +21,7 @@ import type {
   SubmissionStatus,
 } from "./types";
 
-export function dataDir(): string {
-  return path.resolve(process.env.DATA_DIR || "./data");
-}
+export { dataDir } from "./paths";
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS sessions (

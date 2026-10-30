@@ -13,7 +13,7 @@ export async function POST(req: Request) {
   res.cookies.set(AUTH_COOKIE, token.value, {
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production" && process.env.INSECURE_COOKIES !== "1",
+    secure: new URL(req.url).protocol === "https:",
     path: "/",
     maxAge: token.maxAge,
   });

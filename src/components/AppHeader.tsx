@@ -2,9 +2,17 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 
 export function AppHeader() {
   const pathname = usePathname();
+  const [hasPassword, setHasPassword] = useState(false);
+  useEffect(() => {
+    fetch("/api/status")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => setHasPassword(!!d?.passwordEnabled))
+      .catch(() => {});
+  }, [pathname]);
   if (pathname === "/login") return null;
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -24,9 +32,14 @@ export function AppHeader() {
           <Link href="/sessions/new" className="text-slate-600 hover:text-slate-900">
             מבחן חדש
           </Link>
-          <button onClick={logout} className="text-slate-500 hover:text-slate-900">
-            יציאה
-          </button>
+          <Link href="/settings" className="text-slate-600 hover:text-slate-900">
+            הגדרות
+          </Link>
+          {hasPassword && (
+            <button onClick={logout} className="text-slate-500 hover:text-slate-900">
+              יציאה
+            </button>
+          )}
         </nav>
       </div>
     </header>

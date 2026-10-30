@@ -1,13 +1,15 @@
-// Simple single-teacher password protection (works in both Edge middleware and Node routes).
+// Simple single-teacher password protection (used by the Node.js middleware and API routes).
+import { appPassword, sessionSecret } from "./settings";
+
 export const AUTH_COOKIE = "grader_auth";
 const MAX_AGE_SECONDS = 60 * 60 * 24 * 14;
 
 export function authEnabled(): boolean {
-  return !!process.env.APP_PASSWORD;
+  return !!appPassword();
 }
 
 function secret(): string {
-  return (process.env.SESSION_SECRET || "") + "|" + (process.env.APP_PASSWORD || "");
+  return sessionSecret() + "|" + (appPassword() || "");
 }
 
 async function hmac(data: string): Promise<string> {
@@ -43,6 +45,6 @@ export async function verifyToken(token: string | undefined): Promise<boolean> {
 }
 
 export function checkPassword(input: string): boolean {
-  const expected = process.env.APP_PASSWORD || "";
+  const expected = appPassword() || "";
   return safeEqual(input, expected);
 }

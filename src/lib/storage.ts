@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { dataDir } from "./db";
+import { dataDir } from "./paths";
 import { newId } from "./rubric";
 import type { StoredFile } from "./types";
 
